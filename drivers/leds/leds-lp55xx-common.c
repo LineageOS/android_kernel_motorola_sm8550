@@ -23,6 +23,7 @@
 
 /* External clock rate */
 #define LP55XX_CLK_32K			32768
+#define BRIGHTNESS_MAX			255
 
 static struct lp55xx_led *cdev_to_lp55xx_led(struct led_classdev *cdev)
 {
@@ -124,12 +125,91 @@ static ssize_t max_current_show(struct device *dev,
 	return scnprintf(buf, PAGE_SIZE, "%d\n", led->max_current);
 }
 
+static ssize_t blink_show(struct device *dev,
+			    struct device_attribute *attr,
+			    char *buf)
+{
+	struct lp55xx_led *led = dev_to_lp55xx_led(dev);
+
+	return scnprintf(buf, PAGE_SIZE, "%d\n", led->blink);
+}
+
+static ssize_t blink_store(struct device *dev,
+			     struct device_attribute *attr,
+			     const char *buf, size_t len)
+{
+	struct lp55xx_led *led = dev_to_lp55xx_led(dev);
+	struct lp55xx_chip *chip = led->chip;
+	unsigned long curr;
+
+	if (kstrtoul(buf, 0, &curr))
+		return -EINVAL;
+
+	if (curr > BRIGHTNESS_MAX)
+		return -EINVAL;
+
+	if (!chip->cfg->set_led_blink)
+		return len;
+
+	led->blink =  (int) curr;
+	chip->cfg->set_led_blink(led, (int)curr);
+
+	return len;
+}
+
+static ssize_t led_time_show(struct device *dev,
+			    struct device_attribute *attr,
+			    char *buf)
+{
+	struct lp55xx_led *led = dev_to_lp55xx_led(dev);
+
+	return scnprintf(buf, PAGE_SIZE, "%d\n", led->blink);
+}
+
+static ssize_t breath_show(struct device *dev,
+                           struct device_attribute *attr,
+                           char *buf)
+{
+       struct lp55xx_led *led = dev_to_lp55xx_led(dev);
+
+       return scnprintf(buf, PAGE_SIZE, "%d\n", led->breath);
+}
+
+static ssize_t breath_store(struct device *dev,
+                            struct device_attribute *attr,
+                            const char *buf, size_t len)
+{
+       struct lp55xx_led *led = dev_to_lp55xx_led(dev);
+       struct lp55xx_chip *chip = led->chip;
+       unsigned long curr;
+
+       if (kstrtoul(buf, 0, &curr))
+               return -EINVAL;
+
+       if (curr > BRIGHTNESS_MAX)
+               return -EINVAL;
+
+       if (!chip->cfg->set_led_breath)
+               return len;
+
+       led->blink =  (int) curr;
+       chip->cfg->set_led_breath(led, (int)curr);
+
+       return len;
+}
+
 static DEVICE_ATTR_RW(led_current);
 static DEVICE_ATTR_RO(max_current);
+static DEVICE_ATTR_RW(blink);
+static DEVICE_ATTR_RO(led_time);
+static DEVICE_ATTR_RW(breath);
 
 static struct attribute *lp55xx_led_attrs[] = {
 	&dev_attr_led_current.attr,
 	&dev_attr_max_current.attr,
+	&dev_attr_blink.attr,
+	&dev_attr_led_time.attr,
+	&dev_attr_breath.attr,
 	NULL,
 };
 ATTRIBUTE_GROUPS(lp55xx_led);
@@ -214,6 +294,7 @@ static int lp55xx_init_led(struct lp55xx_led *led,
 	led->led_current = pdata->led_config[chan].led_current;
 	led->max_current = pdata->led_config[chan].max_current;
 	led->chan_nr = pdata->led_config[chan].chan_nr;
+	led->blink = 0;
 
 	if (led->chan_nr >= max_channel) {
 		dev_err(dev, "Use channel numbers between 0 and %d\n",
@@ -655,21 +736,31 @@ static int lp55xx_parse_logical_led(struct device_node *np,
 }
 
 struct lp55xx_platform_data *lp55xx_of_populate_pdata(struct device *dev,
-						      struct device_node *np,
-						      struct lp55xx_chip *chip)
+				      struct device_node *np,
+				      struct lp55xx_chip *chip)
 {
 	struct device_node *child;
 	struct lp55xx_platform_data *pdata;
 	struct lp55xx_led_config *cfg;
-	int num_channels;
-	int i = 0;
+	struct lp55xx_predef_pattern *pat = NULL;
+	int num_channels = 0;
+	int cfg_num = 0;
+	int num_patterns = 0;
+	int pat_num = 0;
+	int pat_size;
 	int ret;
 
 	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
 	if (!pdata)
 		return ERR_PTR(-ENOMEM);
 
-	num_channels = of_get_available_child_count(np);
+	for_each_available_child_of_node(np, child) {
+		if (of_property_read_bool(child, "chan-name"))
+			num_channels++;
+		else if (of_property_read_bool(child, "pat-name"))
+			num_patterns++;
+	}
+
 	if (num_channels == 0) {
 		dev_err(dev, "no LED channels\n");
 		return ERR_PTR(-EINVAL);
@@ -679,18 +770,72 @@ struct lp55xx_platform_data *lp55xx_of_populate_pdata(struct device *dev,
 	if (!cfg)
 		return ERR_PTR(-ENOMEM);
 
-	pdata->led_config = &cfg[0];
-	pdata->num_channels = num_channels;
+	if (num_patterns) {
+		pat = devm_kcalloc(dev, num_patterns, sizeof(*pat), GFP_KERNEL);
+		if (!pat)
+			return ERR_PTR(-ENOMEM);
+	}
+
 	cfg->max_channel = chip->cfg->max_channel;
 
 	for_each_available_child_of_node(np, child) {
-		ret = lp55xx_parse_logical_led(child, cfg, i);
-		if (ret) {
-			of_node_put(child);
-			return ERR_PTR(-EINVAL);
+		if (of_property_read_bool(child, "chan-name")) {
+			ret = lp55xx_parse_logical_led(child, cfg, cfg_num);
+			if (ret) {
+				of_node_put(child);
+				return ERR_PTR(-EINVAL);
+			}
+			cfg_num++;
+		} else if (of_property_read_bool(child, "pat-name")) {
+			pat_size = of_property_count_elems_of_size(child,
+							"pat-r",sizeof((*pat[pat_num].r)));
+			if (pat_size <= 0) {
+				pat[pat_num].size_r = 0;
+			} else {
+				char *program = devm_kcalloc(dev, pat_size,
+									sizeof(*(pat[pat_num].r)), GFP_KERNEL);
+				if (!program)
+					return ERR_PTR(-ENOMEM);
+				of_property_read_u8_array(child, "pat-r",program,pat_size);
+				pat[pat_num].r = program;
+				pat[pat_num].size_r = pat_size;
+			}
+
+			pat_size = of_property_count_elems_of_size(child,
+							"pat-g",sizeof((*pat[pat_num].g)));
+			if (pat_size <= 0) {
+				pat[pat_num].size_g = 0;
+			} else {
+				char *program = devm_kcalloc(dev, pat_size,
+									sizeof(*(pat[pat_num].g)), GFP_KERNEL);
+				if (!program)
+					return ERR_PTR(-ENOMEM);
+				of_property_read_u8_array(child,"pat-g",program,pat_size);
+				pat[pat_num].g = program;
+				pat[pat_num].size_g = pat_size;
+			}
+
+			pat_size = of_property_count_elems_of_size(child,
+							"pat-b",sizeof((*pat[pat_num].b)));
+			if (pat_size <= 0) {
+				pat[pat_num].size_b = 0;
+			} else {
+				char *program = devm_kcalloc(dev, pat_size,
+									sizeof(*(pat[pat_num].b)), GFP_KERNEL);
+				if (!program)
+					return ERR_PTR(-ENOMEM);
+				of_property_read_u8_array(child,"pat-b",program,pat_size);
+				pat[pat_num].b = program;
+				pat[pat_num].size_b = pat_size;
+			}
+		pat_num++;
 		}
-		i++;
 	}
+
+	pdata->led_config = &cfg[0];
+	pdata->num_channels = num_channels;
+	pdata->patterns = &pat[0];
+	pdata->num_patterns = num_patterns;
 
 	of_property_read_string(np, "label", &pdata->label);
 	of_property_read_u8(np, "clock-mode", &pdata->clock_mode);

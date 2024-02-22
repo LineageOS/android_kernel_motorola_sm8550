@@ -112,7 +112,9 @@ struct eusb2_repeater {
 	u8			eusb_hs_comp_current;
 
 	u32			*param_override_seq;
-	u8			param_override_seq_cnt;
+	u32			param_override_seq_cnt;
+	u32			*host_param_override_seq;
+	u32			host_param_override_seq_cnt;
 };
 
 /* Perform one or more register read */
@@ -165,13 +167,13 @@ static int eusb2_repeater_masked_write(struct eusb2_repeater *er,
 }
 
 static void eusb2_repeater_update_seq(struct eusb2_repeater *er,
-						u32 *seq, u8 cnt)
+						u32 *seq, u32 cnt)
 {
 	int i;
 
-	dev_dbg(er->ur.dev, "param override seq count:%d\n", cnt);
+	dev_info(er->ur.dev, "param override seq count:%d\n", cnt);
 	for (i = 0; i < cnt; i = i+2) {
-		dev_dbg(er->ur.dev, "write 0x%02x to 0x%02x\n",
+		dev_info(er->ur.dev, "write 0x%02x to 0x%02x\n",
 						seq[i], seq[i+1]);
 		eusb2_repeater_reg_write(er, seq[i+1], seq[i]);
 	}
@@ -319,9 +321,15 @@ static int eusb2_repeater_init(struct usb_repeater *ur)
 			container_of(ur, struct eusb2_repeater, ur);
 	unsigned int rptr_init_cnt = INIT_MAX_CNT;
 
-	/* override init sequence using devicetree based values */
-	eusb2_repeater_update_seq(er, er->param_override_seq,
-			er->param_override_seq_cnt);
+	if (ur->flags & PHY_HOST_MODE) {
+		/* override host init sequence using devicetree based values */
+		eusb2_repeater_update_seq(er, er->host_param_override_seq,
+				er->host_param_override_seq_cnt);
+	} else {
+		/* override init sequence using devicetree based values */
+		eusb2_repeater_update_seq(er, er->param_override_seq,
+				er->param_override_seq_cnt);
+	}
 
 	/* override tune params using debugfs based values */
 	if (er->usb2_crossover <= 0x7)
@@ -501,6 +509,36 @@ static int eusb2_repeater_probe(struct platform_device *pdev)
 				er->param_override_seq_cnt);
 		if (ret) {
 			dev_err(dev, "qcom,param-override-seq read failed %d\n",
+									ret);
+			goto err_probe;
+		}
+	}
+
+	num_elem = of_property_count_elems_of_size(dev->of_node,
+				"qcom,host-param-override-seq",
+				sizeof(*er->host_param_override_seq));
+	if (num_elem > 0) {
+		if (num_elem % 2) {
+			dev_err(dev, "invalid host_param_override_seq_len\n");
+			ret = -EINVAL;
+			goto err_probe;
+		}
+
+		er->host_param_override_seq_cnt = num_elem;
+		er->host_param_override_seq = devm_kcalloc(dev,
+				er->host_param_override_seq_cnt,
+				sizeof(*er->host_param_override_seq), GFP_KERNEL);
+		if (!er->host_param_override_seq) {
+			ret = -ENOMEM;
+			goto err_probe;
+		}
+
+		ret = of_property_read_u32_array(dev->of_node,
+				"qcom,host-param-override-seq",
+				er->host_param_override_seq,
+				er->host_param_override_seq_cnt);
+		if (ret) {
+			dev_err(dev, "qcom,host-param-override-seq read failed %d\n",
 									ret);
 			goto err_probe;
 		}

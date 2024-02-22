@@ -118,6 +118,12 @@ struct lp55xx_device_config {
 	/* current setting function */
 	void (*set_led_current) (struct lp55xx_led *led, u8 led_current);
 
+	/* blink setting function */
+	int (*set_led_blink)(struct lp55xx_led *led, int start);
+
+	/* breath setting function */
+	int (*set_led_breath)(struct lp55xx_led *led, int start);
+
 	/* access program memory when the firmware is loaded */
 	void (*firmware_cb)(struct lp55xx_chip *chip);
 
@@ -179,6 +185,8 @@ struct lp55xx_led {
 	u8 led_current;
 	u8 max_current;
 	u8 brightness;
+	u8 blink;
+	u8 breath;
 	struct lp55xx_chip *chip;
 };
 

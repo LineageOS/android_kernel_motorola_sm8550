@@ -4,6 +4,63 @@
 #
 menu "Qualcomm SoC drivers"
 
+config MMI_DEVICE_DTBS
+	depends on ARCH_QCOM
+	default n
+	bool "Motorola Mobility Device DTBs"
+	help
+		Only include Motorola device specific DTBs to limit the number that
+		get built during kernel compilation.
+
+config RTWO_DTB
+	depends on MMI_DEVICE_DTBS
+	default n
+	bool "Motorola Mobility Rtwo Device DTB"
+	help
+		Only include Motorola Rtwo device specific device tree.
+
+config CTWO_DTB
+	depends on MMI_DEVICE_DTBS
+	default n
+	bool "Motorola Mobility Ctwo Device DTB"
+	help
+		Only include Motorola Ctwo device specific device tree.
+
+config ARC_DTB
+	depends on MMI_DEVICE_DTBS
+	default n
+	bool "Motorola Mobility Arc Device DTB"
+	help
+		Only include Motorola Arc device specific device tree.
+
+config OBERON_DTB
+	depends on MMI_DEVICE_DTBS
+	default n
+	bool "Motorola Mobility Oberon Device DTB"
+	help
+		Only include Motorola Oberon device specific device tree.
+
+config EQE_DTB
+	depends on MMI_DEVICE_DTBS
+	default n
+	bool "Motorola Mobility Eqe Device DTB"
+	help
+		Only include Motorola Eqe device specific device tree.
+
+config MMI_FACTORY_BUILD
+	depends on ARCH_QCOM
+	default n
+	bool "Motorola Factory Build"
+	help
+	  kernel config item in common kernel of Moto factory build.
+
+config MMI_NON_GKI_DEBUG
+	depends on ARCH_QCOM
+	default n
+	bool "Motorola consolidate feature generic config"
+	help
+	  kernel config item in common kernel of Moto consolidate build.
+
 config SPS
 	tristate "SPS support"
 	select GENERIC_ALLOCATOR
@@ -758,8 +815,8 @@ config QCOM_WDOG_BITE_EARLY_PANIC
 config QCOM_WATCHDOG_BARK_TIME
 	depends on QCOM_WDT_CORE
 	int "Qualcomm Technologies, Inc. Watchdog bark time in ms"
-	default 11000
-	range 11000 11000
+	default 16000
+	range 11000 22000
 	help
 	  The amount of time, in milliseconds, that should elapse after
 	  a watchdog timer reset before a bark interrupt is sent from the

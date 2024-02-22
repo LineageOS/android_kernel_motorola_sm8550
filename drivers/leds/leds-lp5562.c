@@ -99,6 +99,8 @@
 #define LP5562_CMD_DIRECT		0x3F
 #define LP5562_PATTERN_OFF		0
 
+#define LP5562_BRIGHTNESS_MAX		255
+
 static inline void lp5562_wait_opmode_done(void)
 {
 	/* operation mode change needs to be longer than 153 us */
@@ -324,6 +326,8 @@ static int lp5562_led_brightness(struct lp55xx_led *led)
 	int ret;
 
 	mutex_lock(&chip->lock);
+	/* Set Brightness needs to stop predef pattern which maybe running */
+	lp5562_run_engine(chip, false);
 	ret = lp55xx_write(chip, addr[led->chan_nr], led->brightness);
 	mutex_unlock(&chip->lock);
 
@@ -388,6 +392,8 @@ static int lp5562_run_predef_led_pattern(struct lp55xx_chip *chip, int mode)
 	lp55xx_write(chip, LP5562_REG_PROG_MEM_ENG3, 0);
 	lp55xx_write(chip, LP5562_REG_PROG_MEM_ENG3 + 1, 0);
 
+	dev_dbg(&chip->cl->dev, "lp5562 led blink...mode:%d\n", mode);
+
 	/* Program engines */
 	lp5562_write_program_memory(chip, LP5562_REG_PROG_MEM_ENG1,
 				ptn->r, ptn->size_r);
@@ -428,6 +434,116 @@ static ssize_t lp5562_store_pattern(struct device *dev,
 		return ret;
 
 	return len;
+}
+
+static int lp5562_led_blink(struct lp55xx_led *led, int mode)
+{
+	struct lp55xx_chip *chip = led->chip;
+	struct lp55xx_predef_pattern *ptn = chip->pdata->patterns;
+	u8 size_r,size_g,size_b;
+	int ret;
+
+	dev_dbg(&chip->cl->dev, "lp5562 led blink...\n");
+
+	if ((mode > LP5562_BRIGHTNESS_MAX) || !ptn)
+		return -EINVAL;
+
+        /* mode is brightness value passed along from MotLight HAL*/
+	led->brightness = mode;
+	ret = lp5562_led_brightness(led);
+
+        /* non zero 'mode' value enables blink. */
+	ptn = chip->pdata->patterns + ((mode!=0) - 1);
+
+	size_r = ptn->size_r;
+	size_g = ptn->size_g;
+	size_b = ptn->size_b;
+
+	mutex_lock(&chip->lock);
+	switch (led->chan_nr)
+	  {
+	  case 0: /* Red*/
+		dev_dbg(&chip->cl->dev, "lp5562 Red led blink ...\n");
+		ptn->size_g = ptn->size_b = 0;
+		break;
+	  case 1: /*Green*/
+		dev_dbg(&chip->cl->dev, "lp5562 Green led blink ...\n");
+		ptn->size_r = ptn->size_b = 0;
+		break;
+	  case 2: /*Blue*/
+		dev_dbg(&chip->cl->dev, "lp5562 Blue led blink ...\n");
+		ptn->size_g = ptn->size_r = 0;
+		break;
+	  case 3: /*white*/
+	  default:
+	    break;
+	  }
+	ret = lp5562_run_predef_led_pattern(chip, (mode!=0));
+
+	ptn->size_r = size_r;
+	ptn->size_g = size_g;
+	ptn->size_b = size_b;
+	mutex_unlock(&chip->lock);
+
+	if (ret)
+		return ret;
+
+	dev_dbg(&chip->cl->dev, "lp5562 led blink success!\n");
+  return ret;
+}
+
+static int lp5562_led_breath(struct lp55xx_led *led, int mode)
+{
+	struct lp55xx_chip *chip = led->chip;
+	struct lp55xx_predef_pattern *ptn = chip->pdata->patterns;
+	u8 size_r,size_g,size_b;
+	int ret;
+
+	dev_dbg(&chip->cl->dev, "lp5562 led breath...\n");
+
+	if ((mode > LP5562_BRIGHTNESS_MAX) || !ptn)
+		return -EINVAL;
+
+        /* non zero 'mode' value enables breath. */
+	ptn = chip->pdata->patterns + ((mode!=0));
+
+	size_r = ptn->size_r;
+	size_g = ptn->size_g;
+	size_b = ptn->size_b;
+
+	mutex_lock(&chip->lock);
+	switch (led->chan_nr)
+	  {
+	  case 0: /* Red*/
+		dev_dbg(&chip->cl->dev, "lp5562 Red led breath ...\n");
+		ptn->size_g = ptn->size_b = 0;
+		break;
+	  case 1: /*Green*/
+		dev_dbg(&chip->cl->dev, "lp5562 Green led breath ...\n");
+		ptn->size_r = ptn->size_b = 0;
+		break;
+	  case 2: /*Blue*/
+		dev_dbg(&chip->cl->dev, "lp5562 Blue led breath ...\n");
+		ptn->size_g = ptn->size_r = 0;
+		break;
+	  case 3: /*white*/
+	  default:
+	    break;
+	  }
+
+        /* Enable Breath with the led predef pattern 2 */
+	ret = lp5562_run_predef_led_pattern(chip, (mode!=0? 2: 0));
+
+	ptn->size_r = size_r;
+	ptn->size_g = size_g;
+	ptn->size_b = size_b;
+	mutex_unlock(&chip->lock);
+
+	if (ret)
+		return ret;
+
+	dev_dbg(&chip->cl->dev, "lp5562 led breath success!\n");
+  return ret;
 }
 
 static ssize_t lp5562_store_engine_mux(struct device *dev,
@@ -506,6 +622,8 @@ static struct lp55xx_device_config lp5562_cfg = {
 	.post_init_device   = lp5562_post_init_device,
 	.set_led_current    = lp5562_set_led_current,
 	.brightness_fn      = lp5562_led_brightness,
+	.set_led_blink      = lp5562_led_blink,
+	.set_led_breath	    = lp5562_led_breath,
 	.run_engine         = lp5562_run_engine,
 	.firmware_cb        = lp5562_firmware_loaded,
 	.dev_attr_group     = &lp5562_group,

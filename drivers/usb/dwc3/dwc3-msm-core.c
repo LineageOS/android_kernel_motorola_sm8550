@@ -52,6 +52,11 @@
 #include "xhci.h"
 #include "debug-ipc.h"
 
+#undef dev_dbg
+#undef pr_debug
+#define dev_dbg dev_info
+#define pr_debug pr_info
+
 #define NUM_LOG_PAGES   12
 #define DWC3_MINIDUMP	0x10000
 
@@ -6101,6 +6106,7 @@ static int dwc3_msm_probe(struct platform_device *pdev)
 		};
 
 		mdwc->otg_capable = true;
+		dwc3_msm_set_role(mdwc, USB_ROLE_NONE);
 		role_desc.fwnode = dev_fwnode(&pdev->dev);
 		mdwc->role_switch = usb_role_switch_register(mdwc->dev,
 								&role_desc);

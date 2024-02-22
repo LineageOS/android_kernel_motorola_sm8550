@@ -21,6 +21,16 @@
 
 #define Q6V5_PANIC_DELAY_MS	200
 
+static char qcom_ssr_reason[256];
+static char *ssr_reason = qcom_ssr_reason;
+#if defined(CONFIG_QCOM_ADSP_DEBUG)
+static bool is_debug_build = true;
+#else
+static bool is_debug_build = false;
+#endif
+
+module_param(ssr_reason, charp, S_IRUGO);
+
 /**
  * qcom_q6v5_prepare() - reinitialize the qcom_q6v5 context before start
  * @q6v5:	reference to qcom_q6v5 context to be reinitialized
@@ -120,6 +130,8 @@ static irqreturn_t q6v5_wdog_interrupt(int irq, void *data)
 		q6v5->rproc->recovery_disabled ?
 		"disabled and lead to device crash" :
 		"enabled and kick reovery process");
+	memset(qcom_ssr_reason, 0, sizeof(qcom_ssr_reason));
+	strlcpy(qcom_ssr_reason, msg, min((size_t)len, (size_t)sizeof(qcom_ssr_reason)));
 
 	if (q6v5->rproc->recovery_disabled) {
 		schedule_work(&q6v5->crash_handler);
@@ -138,6 +150,7 @@ static irqreturn_t q6v5_fatal_interrupt(int irq, void *data)
 	struct qcom_q6v5 *q6v5 = data;
 	size_t len;
 	char *msg;
+	bool modem_audio_issue = false;
 
 	if (!q6v5->running) {
 		dev_info(q6v5->dev, "received fatal irq while q6 is offline\n");
@@ -149,14 +162,24 @@ static irqreturn_t q6v5_fatal_interrupt(int irq, void *data)
 		dev_err(q6v5->dev, "fatal error received: %s\n", msg);
 		trace_rproc_qcom_event(dev_name(q6v5->dev), "q6v5_fatal", msg);
 	} else {
+		if (strstr(msg, "vs.c 227"))
+			modem_audio_issue = true;
+	} else
 		dev_err(q6v5->dev, "fatal error without message\n");
 	}
+
+	memset(qcom_ssr_reason, 0, sizeof(qcom_ssr_reason));
+	strlcpy(qcom_ssr_reason, msg, min((size_t)len, (size_t)sizeof(qcom_ssr_reason)));
 
 	q6v5->running = false;
 	dev_err(q6v5->dev, "rproc recovery state: %s\n",
 		q6v5->rproc->recovery_disabled ? "disabled and lead to device crash" :
 		"enabled and kick reovery process");
-	if (q6v5->rproc->recovery_disabled) {
+	if (is_debug_build && strstr(dev_name(q6v5->dev), "remoteproc-adsp")) {
+		schedule_work(&q6v5->crash_handler);
+	} else if (is_debug_build && strstr(dev_name(q6v5->dev), "remoteproc-mss") && modem_audio_issue) {
+		schedule_work(&q6v5->crash_handler);
+	} else if (q6v5->rproc->recovery_disabled){
 		schedule_work(&q6v5->crash_handler);
 	} else {
 		if (q6v5->ssr_subdev)
