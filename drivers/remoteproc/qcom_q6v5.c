@@ -161,10 +161,9 @@ static irqreturn_t q6v5_fatal_interrupt(int irq, void *data)
 	if (!IS_ERR(msg) && len > 0 && msg[0]) {
 		dev_err(q6v5->dev, "fatal error received: %s\n", msg);
 		trace_rproc_qcom_event(dev_name(q6v5->dev), "q6v5_fatal", msg);
-	} else {
-		if (strstr(msg, "vs.c 227"))
+	} else if (strstr(msg, "vs.c 227")) {
 			modem_audio_issue = true;
-	} else
+	} else {
 		dev_err(q6v5->dev, "fatal error without message\n");
 	}
 
