@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "b288d12f_47f64f01",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 19252
+      },
+      "writtenOn": "2024-05-16T15:41:12Z",
+      "side": 1,
+      "message": "See comment on:\nhttps://review.lineageos.org/c/LineageOS/android_kernel_qcom_sm8550/+/392282",
+      "revId": "a5bfd7229d78d27ece24b8640004f0610950caf5",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
