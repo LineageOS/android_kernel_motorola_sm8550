@@ -5662,7 +5662,9 @@ static int ufs_qcom_probe(struct platform_device *pdev)
 	if (err)
 		ufs_qcom_msg(ERR, dev, "ufshcd_pltfrm_init() failed %d\n", err);
 
-	ufs_qcom_register_hooks();
+	if (!(of_property_read_bool(np, "secondary-storage")))
+		ufs_qcom_register_hooks();
+
 	return err;
 }
 
