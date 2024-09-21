@@ -16,6 +16,24 @@
       "message": "merge conflict?",
       "revId": "9916699c6c8de10a74ebc84a7e7894b8a453d205",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": true,
+      "key": {
+        "uuid": "a263e374_1448f066",
+        "filename": "drivers/net/ethernet/stmicro/stmmac/dwxgmac2.h",
+        "patchSetId": 1
+      },
+      "lineNbr": 393,
+      "author": {
+        "id": 19252
+      },
+      "writtenOn": "2024-09-21T15:42:51Z",
+      "side": 1,
+      "message": "Hmm, looks like it from the LOS qcom sm8550 merge commit here https://review.lineageos.org/c/LineageOS/android_kernel_qcom_sm8550/+/400596\n\nWant to comment on that one please?",
+      "parentUuid": "399f7059_928403b5",
+      "revId": "9916699c6c8de10a74ebc84a7e7894b8a453d205",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
