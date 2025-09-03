@@ -16,6 +16,24 @@
       "message": "Why ddab177adeaa164378823fa28095684bf13c2a02?",
       "revId": "dd0fbc059f41a0d47e183750d212fe95cef02b6c",
       "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    },
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "41cdb9dc_2dee9d92",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 19252
+      },
+      "writtenOn": "2025-09-03T14:15:26Z",
+      "side": 1,
+      "message": "I\u0027m going through the merges to find out what\u0027s breaking them\n\nThis one broke audio on rtwo, there\u0027s something else that broke display where it won\u0027t stay on for more than two seconds\n\nI just haven\u0027t had the spare time to go through them yet tbh and right now I have a bit since my crew at work isn\u0027t so busy and finished wedding stuff",
+      "parentUuid": "d8d24c91_d99a85a2",
+      "revId": "dd0fbc059f41a0d47e183750d212fe95cef02b6c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
     }
   ]
 }
